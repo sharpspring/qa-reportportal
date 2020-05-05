@@ -1,0 +1,455 @@
+NAME:   minio
+REVISION: 1
+RELEASED: Thu Apr  2 18:12:58 2020
+CHART: minio-5.0.19
+USER-SUPPLIED VALUES:
+accessKey: minioAccess
+persistence:
+  size: 40Gi
+secretKey: XCbHdQuH1y
+
+COMPUTED VALUES:
+DeploymentUpdate:
+  maxSurge: 100%
+  maxUnavailable: 0
+  type: RollingUpdate
+StatefulSetUpdate:
+  updateStrategy: RollingUpdate
+accessKey: minioAccess
+affinity: {}
+azuregateway:
+  enabled: false
+  replicas: 4
+b2gateway:
+  enabled: false
+  replicas: 4
+bucketRoot: ""
+buckets: []
+certsPath: /etc/minio/certs/
+clusterDomain: cluster.local
+configPathmc: /etc/minio/mc/
+defaultBucket:
+  enabled: false
+  name: bucket
+  policy: none
+  purge: false
+drivesPerNode: 1
+environment: null
+existingSecret: ""
+extraArgs: []
+fullnameOverride: ""
+gcsgateway:
+  enabled: false
+  gcsKeyJson: ""
+  projectId: ""
+  replicas: 4
+helmKubectlJqImage:
+  pullPolicy: IfNotPresent
+  repository: bskim45/helm-kubectl-jq
+  tag: 3.1.0
+image:
+  pullPolicy: IfNotPresent
+  repository: minio/minio
+  tag: RELEASE.2020-03-25T07-03-04Z
+ingress:
+  annotations: {}
+  enabled: false
+  hosts:
+  - chart-example.local
+  labels: {}
+  path: /
+  tls: []
+livenessProbe:
+  failureThreshold: 3
+  initialDelaySeconds: 5
+  periodSeconds: 30
+  successThreshold: 1
+  timeoutSeconds: 1
+makeBucketJob:
+  annotations: null
+mcImage:
+  pullPolicy: IfNotPresent
+  repository: minio/mc
+  tag: RELEASE.2020-03-14T01-23-37Z
+metrics:
+  serviceMonitor:
+    additionalLabels: {}
+    enabled: false
+mode: standalone
+mountPath: /export
+nameOverride: ""
+nasgateway:
+  enabled: false
+  pv: null
+  replicas: 4
+networkPolicy:
+  allowExternal: true
+  enabled: false
+nodeSelector: {}
+ossgateway:
+  enabled: false
+  endpointURL: ""
+  replicas: 4
+persistence:
+  VolumeName: ""
+  accessMode: ReadWriteOnce
+  enabled: true
+  existingClaim: ""
+  size: 40Gi
+  storageClass: ""
+  subPath: ""
+podAnnotations: {}
+podDisruptionBudget:
+  enabled: false
+  maxUnavailable: 1
+podLabels: {}
+priorityClassName: ""
+readinessProbe:
+  failureThreshold: 3
+  initialDelaySeconds: 60
+  periodSeconds: 15
+  successThreshold: 1
+  timeoutSeconds: 1
+replicas: 4
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+s3gateway:
+  enabled: false
+  replicas: 4
+  serviceEndpoint: ""
+secretKey: XCbHdQuH1y
+securityContext:
+  enabled: false
+  fsGroup: 1000
+  runAsGroup: 1000
+  runAsUser: 1000
+service:
+  annotations: {}
+  clusterIP: null
+  externalIPs: []
+  nodePort: 31311
+  port: 9000
+  type: ClusterIP
+serviceAccount:
+  create: true
+  name: null
+tls:
+  certSecret: ""
+  enabled: false
+  privateKey: private.key
+  publicCrt: public.crt
+tolerations: []
+updatePrometheusJob:
+  annotations: null
+zones: 1
+
+HOOKS:
+MANIFEST:
+
+---
+# Source: minio/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio
+  labels:
+    app: minio
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+type: Opaque
+data:
+  accesskey: "bWluaW9BY2Nlc3M="
+  secretkey: "WENiSGRRdUgxeQ=="
+---
+# Source: minio/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio
+  labels:
+    app: minio
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+data:
+  initialize: |-
+    #!/bin/sh
+    set -e ; # Have script exit in the event of a failed command.
+    MC_CONFIG_DIR="/etc/minio/mc/"
+    MC="/usr/bin/mc --config-dir ${MC_CONFIG_DIR}"
+    
+    # connectToMinio
+    # Use a check-sleep-check loop to wait for Minio service to be available
+    connectToMinio() {
+      SCHEME=$1
+      ATTEMPTS=0 ; LIMIT=29 ; # Allow 30 attempts
+      set -e ; # fail if we can't read the keys.
+      ACCESS=$(cat /config/accesskey) ; SECRET=$(cat /config/secretkey) ;
+      set +e ; # The connections to minio are allowed to fail.
+      echo "Connecting to Minio server: $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT" ;
+      MC_COMMAND="${MC} config host add myminio $SCHEME://$MINIO_ENDPOINT:$MINIO_PORT $ACCESS $SECRET" ;
+      $MC_COMMAND ;
+      STATUS=$? ;
+      until [ $STATUS = 0 ]
+      do
+        ATTEMPTS=`expr $ATTEMPTS + 1` ;
+        echo \"Failed attempts: $ATTEMPTS\" ;
+        if [ $ATTEMPTS -gt $LIMIT ]; then
+          exit 1 ;
+        fi ;
+        sleep 2 ; # 1 second intervals between attempts
+        $MC_COMMAND ;
+        STATUS=$? ;
+      done ;
+      set -e ; # reset `e` as active
+      return 0
+    }
+    
+    # checkBucketExists ($bucket)
+    # Check if the bucket exists, by using the exit code of `mc ls`
+    checkBucketExists() {
+      BUCKET=$1
+      CMD=$(${MC} ls myminio/$BUCKET > /dev/null 2>&1)
+      return $?
+    }
+    
+    # createBucket ($bucket, $policy, $purge)
+    # Ensure bucket exists, purging if asked to
+    createBucket() {
+      BUCKET=$1
+      POLICY=$2
+      PURGE=$3
+    
+      # Purge the bucket, if set & exists
+      # Since PURGE is user input, check explicitly for `true`
+      if [ $PURGE = true ]; then
+        if checkBucketExists $BUCKET ; then
+          echo "Purging bucket '$BUCKET'."
+          set +e ; # don't exit if this fails
+          ${MC} rm -r --force myminio/$BUCKET
+          set -e ; # reset `e` as active
+        else
+          echo "Bucket '$BUCKET' does not exist, skipping purge."
+        fi
+      fi
+    
+      # Create the bucket if it does not exist
+      if ! checkBucketExists $BUCKET ; then
+        echo "Creating bucket '$BUCKET'"
+        ${MC} mb myminio/$BUCKET
+      else
+        echo "Bucket '$BUCKET' already exists."
+      fi
+    
+      # At this point, the bucket should exist, skip checking for existence
+      # Set policy on the bucket
+      echo "Setting policy of bucket '$BUCKET' to '$POLICY'."
+      ${MC} policy set $POLICY myminio/$BUCKET
+    }
+    
+    # Try connecting to Minio instance
+    scheme=http
+    connectToMinio $scheme
+---
+# Source: minio/templates/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio
+  labels:
+    app: minio
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "40Gi"
+---
+# Source: minio/templates/post-install-prometheus-metrics-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: minio-update-prometheus-secret
+  labels:
+    app: minio-update-prometheus-secret
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+---
+# Source: minio/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "minio"
+  namespace: "default"
+---
+# Source: minio/templates/post-install-prometheus-metrics-role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: minio-update-prometheus-secret
+  labels:
+    app: minio-update-prometheus-secret
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - create
+      - update
+      - patch
+    resourceNames:
+      - minio-prometheus
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - create
+  - apiGroups:
+      - monitoring.coreos.com
+    resources:
+      - servicemonitors
+    verbs:
+      - get
+    resourceNames:
+      - minio
+---
+# Source: minio/templates/post-install-prometheus-metrics-rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: minio-update-prometheus-secret
+  labels:
+    app: minio-update-prometheus-secret
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: minio-update-prometheus-secret
+subjects:
+  - kind: ServiceAccount
+    name: minio-update-prometheus-secret
+    namespace: default
+---
+# Source: minio/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app: minio
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+  selector:
+    app: minio
+    release: minio
+---
+# Source: minio/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels:
+    app: minio
+    chart: minio-5.0.19
+    release: minio
+    heritage: Tiller
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: minio
+      release: minio
+  template:
+    metadata:
+      name: minio
+      labels:
+        app: minio
+        release: minio
+      annotations:
+        rollme: "ikGs7"
+        checksum/secrets: 23c6b417359faa9c48ad99655fdab267eceb614841e18b7741075f02921d51ab
+        checksum/config: 4885d2b48a22da8ec1b370cc613acd42b147463b65d145723c7751d54f5268c4
+    spec:
+      serviceAccountName: "minio"
+      containers:
+        - name: minio
+          image: "minio/minio:RELEASE.2020-03-25T07-03-04Z"
+          imagePullPolicy: IfNotPresent
+          command: [ "/bin/sh",
+          "-ce",
+          "/usr/bin/docker-entrypoint.sh minio -S /etc/minio/certs/ server /export" ]
+          volumeMounts:
+            - name: export
+              mountPath: /export
+          ports:
+            - name: http
+              containerPort: 9000
+          env:
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio
+                  key: accesskey
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio
+                  key: secretkey
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            
+      volumes:
+        - name: export
+          persistentVolumeClaim:
+            claimName: minio
+        - name: minio-user
+          secret:
+            secretName: minio

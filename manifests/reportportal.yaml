@@ -1,0 +1,746 @@
+REVISION: 1
+RELEASED: Fri Apr  3 09:49:36 2020
+CHART: reportportal-5
+USER-SUPPLIED VALUES:
+postgresql:
+  SecretName: postgresql
+rabbitmq:
+  SecretName: rabbitmq-rabbitmq-ha
+
+COMPUTED VALUES:
+elasticsearch:
+  endpoint:
+    address: elasticsearch-master
+    cloudservice: false
+    port: 9200
+  installdep:
+    enable: false
+ingress:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/proxy-body-size: 128m
+    nginx.ingress.kubernetes.io/proxy-buffer-size: 512k
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: 512k
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "8000"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "4000"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "4000"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/x-forwarded-prefix: /$1
+  enable: true
+  hosts:
+  - reportportal.k8.com
+  usedomainname: false
+migrations:
+  pullPolicy: Always
+  repository: reportportal/migrations
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  tag: 5.0.0
+minio:
+  accesskey: minioAccess
+  enabled: true
+  endpoint: http://minio.default.svc.cluster.local:9000
+  installdep:
+    enable: false
+  region: null
+  secretkey: XCbHdQuH1y
+nodeSelector:
+  enabled: false
+  selector:
+    reportportal: true
+postgresql:
+  SecretName: postgresql
+  endpoint:
+    address: postgresql.default.svc.cluster.local
+    cloudservice: false
+    dbName: reportportal
+    password: XCbHdQuH1y
+    port: 5432
+    user: rpuser
+  installdep:
+    enable: false
+rabbitmq:
+  SecretName: rabbitmq-rabbitmq-ha
+  endpoint:
+    address: rabbitmq-rabbitmq-ha.default.svc.cluster.local
+    apiport: 15672
+    apiuser: rabbitmq
+    cloudservice: false
+    password: JzeXx0YrhxPEJ1UM9OduT7iT
+    port: 5672
+    user: rabbitmq
+  installdep:
+    enable: false
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    name: reportportal
+rp:
+  healthEndpoint: /health
+  infoEndpoint: /info
+serviceanalyzer:
+  name: analyzer
+  pullPolicy: Always
+  repository: reportportal/service-analyzer
+  resources:
+    limits:
+      cpu: 100m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  tag: 5.0.0
+serviceapi:
+  jvmArgs: -Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0
+    -XX:+UnlockExperimentalVMOptions -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp
+  name: api
+  pullPolicy: Always
+  queues:
+    perPodNumber: null
+    totalNumber: null
+  readinessProbe:
+    failureThreshold: 20
+    initialDelaySeconds: 30
+    periodSeconds: 20
+    timeoutSeconds: 3
+  repository: reportportal/service-api
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+  tag: 5.0.0
+serviceindex:
+  name: index
+  pullPolicy: Always
+  repository: reportportal/service-index
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 150m
+      memory: 128Mi
+  tag: 5.0.5
+serviceui:
+  name: ui
+  pullPolicy: Always
+  repository: reportportal/service-ui
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  tag: 5.0.0
+uat:
+  jvmArgs: -Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0
+  name: uat
+  pullPolicy: Always
+  repository: reportportal/service-authorization
+  resources:
+    limits:
+      cpu: 500m
+      memory: 2048Mi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+  sessionLiveTime: 43200
+  tag: 5.0.0
+
+HOOKS:
+MANIFEST:
+
+---
+# Source: reportportal/templates/reportportal-serviceaccount.yaml
+
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+    name: reportportal
+    namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+    name: release-name-reportportal-service-reader
+    namespace: default
+rules:
+    - apiGroups:
+        - ""
+      resources: ["pods","services"]
+      verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+    name: release-name-reportportal-user-binding
+    namespace: default
+roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: release-name-reportportal-service-reader
+subjects:
+    - kind: ServiceAccount
+      name: reportportal
+      namespace: default
+---
+# Source: reportportal/templates/analyzer-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-reportportal-analyzer
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+spec:
+  ports:
+  - name: headless
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-name-reportportal-analyzer
+  type: ClusterIP
+
+---
+# Source: reportportal/templates/api-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-reportportal-api
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+  annotations:
+    service: api
+    infoEndpoint: /info
+spec:
+  ports:
+  - name: headless
+    port: 8585
+    protocol: TCP
+    targetPort: 8585
+  selector:
+    component: release-name-reportportal-api
+  type: ClusterIP
+
+
+---
+# Source: reportportal/templates/index-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-reportportal-index
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+  annotations:
+    service: index
+    infoEndpoint: /info
+spec:
+  ports:
+  - name: headless
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-name-reportportal-index
+  type: ClusterIP
+
+---
+# Source: reportportal/templates/uat-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-reportportal-uat
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+  annotations:
+    service: uat
+    infoEndpoint: /info
+spec:
+  ports:
+  - name: headless
+    port: 9999
+    protocol: TCP
+    targetPort: 9999
+  selector:
+    component: release-name-reportportal-uat
+  type: ClusterIP
+
+---
+# Source: reportportal/templates/ui-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-reportportal-ui
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+  annotations:
+    service: ui
+    infoEndpoint: /info
+spec:
+  ports:
+  - name: headless
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-name-reportportal-ui
+  type: ClusterIP
+
+---
+# Source: reportportal/templates/api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-reportportal-api
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: release-name-reportportal-api
+  template:
+    metadata:
+      labels:
+        component: release-name-reportportal-api
+    spec:
+      containers:
+      - env:
+        - name: LOGGING_LEVEL_ORG_HIBERNATE_SQL
+          value: "info"
+        - name: RP_REQUESTLOGGING
+          value: "false"
+        
+        - name: RP_AMQP_QUEUES
+          value: "10"
+        - name: RP_AMQP_QUEUESPERPOD
+          value: "10"
+        
+        
+        - name: JAVA_OPTS
+          value: "-Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0 -XX:+UnlockExperimentalVMOptions -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+        
+        - name: RP_AMQP_HOST
+          value: "rabbitmq-rabbitmq-ha.default.svc.cluster.local"
+        - name: RP_AMQP_PORT
+          value: "5672"
+        - name: RP_AMQP_USER
+          value: "rabbitmq"
+        - name: RP_AMQP_PASS
+        
+          valueFrom:
+            secretKeyRef:
+              name: "rabbitmq-rabbitmq-ha"
+              key: "rabbitmq-password"
+        
+        - name: RP_AMQP_APIPORT
+          value: "15672"
+        - name: RP_AMQP_APIUSER
+          value: "rabbitmq"
+        - name: RP_AMQP_APIPASS
+        
+          valueFrom:
+            secretKeyRef:
+              name: "rabbitmq-rabbitmq-ha"
+              key: "rabbitmq-password"
+        
+        - name: RP_DB_HOST
+          value: "postgresql.default.svc.cluster.local"
+        - name: RP_DB_PORT
+          value: "5432"
+        
+        - name: RP_DB_USER
+          value: "rpuser"
+        - name: RP_DB_PASS
+        
+          valueFrom:
+            secretKeyRef:
+              name: "postgresql"
+              key: "postgresql-password"
+        
+        
+        - name: RP_BINARYSTORE_TYPE
+          value: "minio"
+        - name: RP_BINARYSTORE_MINIO_ENDPOINT
+          value: "http://minio.default.svc.cluster.local:9000"
+             
+        
+        - name: RP_BINARYSTORE_MINIO_ACCESSKEY
+          value: "minioAccess"
+        - name: RP_BINARYSTORE_MINIO_SECRETKEY
+          value: "XCbHdQuH1y"
+       
+       
+        image: "reportportal/service-api:5.0.0"
+        name: api
+        ports:
+        - containerPort: 8585
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1024Mi
+          limits:
+            cpu: 1000m
+            memory: 2048Mi
+        readinessProbe:
+          httpGet:
+            path: "/health"
+            port: 8585
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 3
+          failureThreshold: 20
+        
+
+---
+# Source: reportportal/templates/index-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-reportportal-index
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: release-name-reportportal-index
+  template:
+    metadata:
+      labels:
+        component: release-name-reportportal-index
+    spec:
+      serviceAccountName: reportportal
+      containers:
+      - env:
+        - name: K8S_MODE
+          value: "true"
+        image: "reportportal/service-index:5.0.5"
+        name: index
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: "/health"
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 150m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        
+
+---
+# Source: reportportal/templates/uat-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-reportportal-uat
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: release-name-reportportal-uat
+  template:
+    metadata:
+      labels:
+        component: release-name-reportportal-uat
+    spec:
+      containers:
+      - env:
+        
+        - name: JAVA_OPTS
+          value: "-Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0"
+        
+        - name: RP_SESSION_LIVE
+          value: "43200"
+        - name: RP_DB_HOST
+          value: "postgresql.default.svc.cluster.local"
+        - name: RP_DB_PORT
+          value: "5432"
+        - name: RP_DB_USER
+          value: "rpuser"
+        - name: RP_DB_PASS
+        
+          valueFrom:
+            secretKeyRef:
+              name: "postgresql"
+              key: "postgresql-password"
+        
+        
+        - name: RP_BINARYSTORE_TYPE
+          value: "minio"
+        - name: RP_BINARYSTORE_MINIO_ENDPOINT
+          value: "http://minio.default.svc.cluster.local:9000"
+         
+        
+        - name: RP_BINARYSTORE_MINIO_ACCESSKEY
+          value: "minioAccess"
+        - name: RP_BINARYSTORE_MINIO_SECRETKEY
+          value: "XCbHdQuH1y"
+        
+        
+        name: uat
+        image: "reportportal/service-authorization:5.0.0"
+        ports:
+        - containerPort: 9999
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 500m
+            memory: 2048Mi
+        readinessProbe:
+          httpGet:
+            path: "/health"
+            port: 9999
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 5
+        
+
+---
+# Source: reportportal/templates/ui-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-reportportal-ui
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: release-name-reportportal-ui
+  template:
+    metadata:
+      labels:
+        component: release-name-reportportal-ui
+    spec:
+      containers:
+      - env:
+        - name: RP_SERVER_PORT
+          value: "8080"
+        image: "reportportal/service-ui:5.0.0"
+        name: ui
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: "/health"
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+        
+
+---
+# Source: reportportal/templates/analyzer-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: release-name-reportportal-analyzer
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      component: release-name-reportportal-analyzer
+  serviceName: release-name-reportportal-analyzer
+  template:
+    metadata:
+      labels:
+        component: release-name-reportportal-analyzer
+    spec:
+      containers:
+      - env:
+        - name: RP_AMQP_PASS
+        
+          valueFrom:
+            secretKeyRef:
+              name: "rabbitmq-rabbitmq-ha"
+              key: "rabbitmq-password"
+        
+        - name: AMQP_URL
+          value: "amqp://rabbitmq:$(RP_AMQP_PASS)@rabbitmq-rabbitmq-ha.default.svc.cluster.local:5672/"
+        - name: AMQP_EXCHANGE_NAME
+          value: "analyzer-default"
+        - name: ES_HOSTS
+        
+          value: "http://elasticsearch-master:9200"
+        
+        image: "reportportal/service-analyzer:5.0.0"
+        name: analyzer
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 100m
+            memory: 512Mi
+        
+
+---
+# Source: reportportal/templates/migrations-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: release-name-reportportal-migrations
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  template:
+    metadata:
+      labels:
+        component: release-name-reportportal-migrations
+    spec:
+      restartPolicy: Never
+      containers:
+      - env:
+        - name: POSTGRES_SERVER
+          value: "postgresql.default.svc.cluster.local"
+        - name: POSTGRES_DB
+          value: "reportportal"
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_USER
+          value: "rpuser"
+        - name: POSTGRES_PASSWORD
+        
+          valueFrom:
+            secretKeyRef:
+              name: "postgresql"
+              key: "postgresql-password"
+        
+        image: "reportportal/migrations:5.0.0"
+        name: migrations
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        
+
+---
+# Source: reportportal/templates/gateway-ingress.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: release-name-reportportal-gateway-ingress
+  labels:     
+    heritage: "Tiller"
+    release: "release-name"
+    chart: reportportal-5
+    app: "reportportal"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "128m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "512k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-busy-buffers-size: "512k"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "8000"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "4000"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "4000"
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/x-forwarded-prefix: "/$1"
+spec:
+  rules:
+
+  - http:
+      paths:
+      - path: /()?(.*)
+        backend:
+          serviceName: release-name-reportportal-index
+          servicePort: headless
+      - path: /(ui)/?(.*)
+        backend:
+          serviceName: release-name-reportportal-ui
+          servicePort: headless
+      - path: /(uat)/?(.*)
+        backend:
+          serviceName: release-name-reportportal-uat
+          servicePort: headless
+      - path: /(api)/?(.*)
+        backend:
+          serviceName: release-name-reportportal-api
+          servicePort: headless
+
+status:
+  loadBalancer: {}
+

@@ -1,0 +1,506 @@
+NAME:   rabbitmq
+REVISION: 1
+RELEASED: Thu Apr  2 17:21:35 2020
+CHART: rabbitmq-ha-1.18.0
+USER-SUPPLIED VALUES:
+rabbitmqPassword: JzeXx0YrhxPEJ1UM9OduT7iT
+rabbitmqUsername: rabbitmq
+
+COMPUTED VALUES:
+busyboxImage:
+  pullPolicy: Always
+  repository: busybox
+  tag: latest
+clusterDomain: cluster.local
+definitions:
+  bindings: ""
+  exchanges: ""
+  parameters: ""
+  permissions: ""
+  policies: ""
+  queues: ""
+  users: ""
+  vhosts: ""
+definitionsSource: definitions.json
+existingConfigMap: false
+existingSecret: ""
+extraConfig: ""
+extraLabels: {}
+extraPlugins: |
+  rabbitmq_shovel,
+  rabbitmq_shovel_management,
+  rabbitmq_federation,
+  rabbitmq_federation_management,
+extraVolumeMounts: []
+extraVolumes: []
+image:
+  pullPolicy: IfNotPresent
+  repository: rabbitmq
+  tag: 3.7-alpine
+ingress:
+  annotations: null
+  enabled: false
+  path: /
+  tls: false
+  tlsSecret: myTlsSecret
+initContainer:
+  resources: {}
+livenessProbe:
+  failureThreshold: 6
+  initialDelaySeconds: 120
+  periodSeconds: 10
+  timeoutSeconds: 5
+managementPassword: E9R3fjZm4ejFkVFE
+managementUsername: management
+nodeSelector: {}
+persistentVolume:
+  accessModes:
+  - ReadWriteOnce
+  annotations: {}
+  enabled: false
+  name: data
+  size: 8Gi
+podAnnotations: {}
+podAntiAffinity: soft
+podManagementPolicy: OrderedReady
+prometheus:
+  exporter:
+    capabilities: bert,no_sort
+    enabled: false
+    env: {}
+    image:
+      pullPolicy: IfNotPresent
+      repository: kbudde/rabbitmq-exporter
+      tag: v0.29.0
+    port: 9090
+    resources: {}
+  operator:
+    alerts:
+      enabled: true
+      labels: {}
+      selector:
+        role: alert-rules
+    enabled: true
+    serviceMonitor:
+      interval: 10s
+      namespace: monitoring
+      selector:
+        prometheus: kube-prometheus
+rabbitmqAmqpsSupport:
+  amqpsNodePort: 5671
+  config: |
+    # listeners.ssl.default             = 5671
+    # ssl_options.cacertfile            = /etc/cert/cacert.pem
+    # ssl_options.certfile              = /etc/cert/cert.pem
+    # ssl_options.keyfile               = /etc/cert/key.pem
+    # ssl_options.verify                = verify_peer
+    # ssl_options.fail_if_no_peer_cert  = false
+  enabled: false
+rabbitmqAuth:
+  config: |
+    # auth_mechanisms.1 = PLAIN
+    # auth_mechanisms.2 = AMQPLAIN
+    # auth_mechanisms.3 = EXTERNAL
+  enabled: false
+rabbitmqAuthHTTP:
+  config: |
+    # auth_backends.1 = http
+    # auth_http.user_path     = http://some-server/auth/user
+    # auth_http.vhost_path    = http://some-server/auth/vhost
+    # auth_http.resource_path = http://some-server/auth/resource
+    # auth_http.topic_path    = http://some-server/auth/topic
+  enabled: false
+rabbitmqCert:
+  cacertfile: ""
+  certfile: ""
+  enabled: false
+  existingSecret: ""
+  keyfile: ""
+rabbitmqClusterPartitionHandling: autoheal
+rabbitmqEpmdPort: 4369
+rabbitmqHipeCompile: false
+rabbitmqLDAPPlugin:
+  config: |
+    # auth_backends.1 = ldap
+    # auth_ldap.servers.1  = my-ldap-server
+    # auth_ldap.user_dn_pattern = cn=${username},ou=People,dc=example,dc=com
+    # auth_ldap.use_ssl    = false
+    # auth_ldap.port       = 389
+    # auth_ldap.log        = false
+  enabled: false
+rabbitmqMQTTPlugin:
+  config: |
+    # mqtt.default_user     = guest
+    # mqtt.default_pass     = guest
+    # mqtt.allow_anonymous  = true
+  enabled: false
+rabbitmqManagerPort: 15672
+rabbitmqMemoryHighWatermark: 256MB
+rabbitmqMemoryHighWatermarkType: absolute
+rabbitmqNodePort: 5672
+rabbitmqPassword: JzeXx0YrhxPEJ1UM9OduT7iT
+rabbitmqSTOMPPlugin:
+  config: |
+    # stomp.default_user = guest
+    # stomp.default_pass = guest
+  enabled: false
+rabbitmqUsername: rabbitmq
+rabbitmqVhost: /
+rabbitmqWebMQTTPlugin:
+  config: |
+    # web_mqtt.ssl.port       = 12345
+    # web_mqtt.ssl.backlog    = 1024
+    # web_mqtt.ssl.certfile   = /etc/cert/cacert.pem
+    # web_mqtt.ssl.keyfile    = /etc/cert/cert.pem
+    # web_mqtt.ssl.cacertfile = /etc/cert/key.pem
+    # web_mqtt.ssl.password   = changeme
+  enabled: false
+rabbitmqWebSTOMPPlugin:
+  config: |
+    # web_stomp.ws_frame = binary
+    # web_stomp.cowboy_opts.max_keepalive = 10
+  enabled: false
+rbac:
+  create: true
+readinessProbe:
+  failureThreshold: 6
+  initialDelaySeconds: 20
+  periodSeconds: 5
+  timeoutSeconds: 3
+replicaCount: 3
+resources: {}
+service:
+  annotations: {}
+  clusterIP: None
+  externalIPs: []
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  type: ClusterIP
+serviceAccount:
+  create: true
+terminationGracePeriodSeconds: 10
+tolerations: []
+updateStrategy: OnDelete
+
+HOOKS:
+MANIFEST:
+
+---
+# Source: rabbitmq-ha/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-rabbitmq-ha
+  labels:
+    app: rabbitmq-ha
+    chart: "rabbitmq-ha-1.18.0"
+    release: "rabbitmq"
+    heritage: "Tiller"
+type: Opaque
+data:
+  rabbitmq-username: "cmFiYml0bXE="
+  rabbitmq-password: "SnplWHgwWXJoeFBFSjFVTTlPZHVUN2lU"
+  rabbitmq-erlang-cookie: "V0dzTjRmUmpzZzJqd2IwNVdYQmQwNzhQb0F2YkEyUGI="
+  definitions.json: "ewogICJ1c2VycyI6IFsKICAgIHsKICAgICAgIm5hbWUiOiAibWFuYWdlbWVudCIsCiAgICAgICJwYXNzd29yZCI6ICJFOVIzZmpabTRlakZrVkZFIiwKICAgICAgInRhZ3MiOiAibWFuYWdlbWVudCIKICAgIH0sCiAgICB7CiAgICAgICJuYW1lIjogInJhYmJpdG1xIiwKICAgICAgInBhc3N3b3JkIjogIkp6ZVh4MFlyaHhQRUoxVU05T2R1VDdpVCIsCiAgICAgICJ0YWdzIjogImFkbWluaXN0cmF0b3IiCiAgICB9CiAgXSwKICAidmhvc3RzIjogWwogICAgewogICAgICAibmFtZSI6ICIvIgogICAgfQogIF0sCiAgInBlcm1pc3Npb25zIjogWwogICAgewogICAgICAidXNlciI6ICJyYWJiaXRtcSIsCiAgICAgICJ2aG9zdCI6ICIvIiwKICAgICAgImNvbmZpZ3VyZSI6ICIuKiIsCiAgICAgICJyZWFkIjogIi4qIiwKICAgICAgIndyaXRlIjogIi4qIgogICAgfQogIF0sCiAgInBhcmFtZXRlcnMiOiBbCiAgICAKICBdLAogICJwb2xpY2llcyI6IFsKICAgIAogIF0sCiAgInF1ZXVlcyI6IFsKICAgIAogIF0sCiAgImV4Y2hhbmdlcyI6IFsKICAgIAogIF0sCiAgImJpbmRpbmdzIjogWwogICAgCiAgXQp9"
+---
+# Source: rabbitmq-ha/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-rabbitmq-ha
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.18.0
+    release: rabbitmq
+    heritage: Tiller
+data:
+  enabled_plugins: |
+    [
+      rabbitmq_shovel,
+      rabbitmq_shovel_management,
+      rabbitmq_federation,
+      rabbitmq_federation_management,
+      
+
+      rabbitmq_consistent_hash_exchange,
+      rabbitmq_management,
+      rabbitmq_peer_discovery_k8s
+    ].
+
+  rabbitmq.conf: |
+    ## RabbitMQ configuration
+    ## Ref: https://github.com/rabbitmq/rabbitmq-server/blob/master/docs/rabbitmq.conf.example
+
+    ## Authentification
+
+    ## Clustering
+    cluster_formation.peer_discovery_backend  = rabbit_peer_discovery_k8s
+    cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
+    cluster_formation.k8s.address_type = hostname
+    cluster_formation.node_cleanup.interval = 10
+    # Set to false if automatic cleanup of absent nodes is desired.
+    # This can be dangerous, see http://www.rabbitmq.com/cluster-formation.html#node-health-checks-and-cleanup.
+    cluster_formation.node_cleanup.only_log_warning = true
+    cluster_partition_handling = autoheal
+
+    ## The default "guest" user is only permitted to access the server
+    ## via a loopback interface (e.g. localhost)
+    loopback_users.guest = false
+
+    management.load_definitions = /etc/definitions/definitions.json
+
+    ## Memory-based Flow Control threshold
+    vm_memory_high_watermark.absolute = 256MB
+
+    ## Auth HTTP Backend Plugin
+
+    ## LDAP Plugin
+
+    ## MQTT Plugin
+
+    ## Web MQTT Plugin
+
+    ## STOMP Plugin
+
+    ## Web STOMP Plugin
+
+    ## AMQPS support
+---
+# Source: rabbitmq-ha/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: "rabbitmq-ha-1.18.0"
+    release: "rabbitmq"
+    heritage: "Tiller"
+  name: rabbitmq-rabbitmq-ha
+---
+# Source: rabbitmq-ha/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: "rabbitmq-ha-1.18.0"
+    release: "rabbitmq"
+    heritage: "Tiller"
+  name: rabbitmq-rabbitmq-ha
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get"]
+---
+# Source: rabbitmq-ha/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  labels:
+    app: rabbitmq-ha
+    chart: "rabbitmq-ha-1.18.0"
+    release: "rabbitmq"
+    heritage: "Tiller"
+  name: rabbitmq-rabbitmq-ha
+subjects:
+  - kind: ServiceAccount
+    name: rabbitmq-rabbitmq-ha
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rabbitmq-rabbitmq-ha
+---
+# Source: rabbitmq-ha/templates/service-discovery.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: rabbitmq-rabbitmq-ha-discovery
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.18.0
+    release: rabbitmq
+    heritage: Tiller
+spec:
+  clusterIP: None
+  ports:
+    - name: http
+      protocol: TCP
+      port: 15672
+      targetPort: http
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: amqp
+    - name: epmd
+      protocol: TCP
+      port: 4369
+      targetPort: epmd
+  publishNotReadyAddresses: true
+  selector:
+    app: rabbitmq-ha
+    release: rabbitmq
+  type: ClusterIP
+---
+# Source: rabbitmq-ha/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-rabbitmq-ha
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.18.0
+    release: rabbitmq
+    heritage: Tiller
+spec:
+  clusterIP: "None"
+  ports:
+    - name: http
+      protocol: TCP
+      port: 15672
+      targetPort: http
+    - name: amqp
+      protocol: TCP
+      port: 5672
+      targetPort: amqp
+    - name: epmd
+      protocol: TCP
+      port: 4369
+      targetPort: epmd
+    
+  selector:
+    app: rabbitmq-ha
+    release: rabbitmq
+  type: ClusterIP
+---
+# Source: rabbitmq-ha/templates/statefulset.yaml
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: rabbitmq-rabbitmq-ha
+  labels:
+    app: rabbitmq-ha
+    chart: rabbitmq-ha-1.18.0
+    release: rabbitmq
+    heritage: Tiller
+spec:
+  podManagementPolicy: OrderedReady
+  serviceName: rabbitmq-rabbitmq-ha-discovery
+  replicas: 3
+  updateStrategy:
+    type: OnDelete
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-ha
+        release: rabbitmq
+      annotations:
+        checksum/config: c16ddcd31185e5faa55b2ff5070d7abee7ffaea55133c0fddd545076162ce4a6
+    spec:
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: rabbitmq-rabbitmq-ha
+      initContainers:
+        - name: copy-rabbitmq-config
+          image: busybox:latest
+          imagePullPolicy: Always
+          command: ['sh', '-c', 'cp /configmap/* /etc/rabbitmq; rm -f /var/lib/rabbitmq/.erlang.cookie']
+          resources:
+            {}
+            
+          volumeMounts:
+            - name: configmap
+              mountPath: /configmap
+            - name: config
+              mountPath: /etc/rabbitmq
+            - name: data
+              mountPath: /var/lib/rabbitmq
+      containers:
+        - name: rabbitmq-ha
+          image: rabbitmq:3.7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: epmd
+              protocol: TCP
+              containerPort: 4369
+            - name: amqp
+              protocol: TCP
+              containerPort: 5672
+            - name: http
+              protocol: TCP
+              containerPort: 15672
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - 'wget -O - -q --header "Authorization: Basic bWFuYWdlbWVudDpFOVIzZmpabTRlakZrVkZF" http://localhost:15672/api/healthchecks/node | grep -qF "{\"status\":\"ok\"}"'
+            initialDelaySeconds: 120
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - 'wget -O - -q --header "Authorization: Basic bWFuYWdlbWVudDpFOVIzZmpabTRlakZrVkZF" http://localhost:15672/api/healthchecks/node | grep -qF "{\"status\":\"ok\"}"'
+            initialDelaySeconds: 20
+            timeoutSeconds: 3
+            periodSeconds: 5
+            failureThreshold: 6
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: RABBITMQ_USE_LONGNAME
+              value: "true"
+            - name: RABBITMQ_NODENAME
+              value: rabbit@$(MY_POD_NAME).rabbitmq-rabbitmq-ha-discovery.default.svc.cluster.local
+            - name: K8S_HOSTNAME_SUFFIX
+              value: .rabbitmq-rabbitmq-ha-discovery.default.svc.cluster.local
+            - name: K8S_SERVICE_NAME
+              value: rabbitmq-rabbitmq-ha-discovery
+            - name: RABBITMQ_ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-rabbitmq-ha
+                  key: rabbitmq-erlang-cookie
+          resources:
+            {}
+            
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+            - name: config
+              mountPath: /etc/rabbitmq
+            - name: definitions
+              mountPath: /etc/definitions
+              readOnly: true
+        
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app: rabbitmq-ha
+                    release: rabbitmq
+      volumes:
+        - name: config
+          emptyDir: {}
+        - name: configmap
+          configMap:
+            name: rabbitmq-rabbitmq-ha
+        - name: definitions
+          secret:
+            secretName: rabbitmq-rabbitmq-ha
+            items:
+            - key: definitions.json
+              path: definitions.json
+        - name: data
+          emptyDir: {}
